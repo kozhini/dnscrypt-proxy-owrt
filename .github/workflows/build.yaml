@@ -60,6 +60,12 @@ jobs:
           echo "package_dir=${PACKAGE_DIR}" >> $GITHUB_OUTPUT
           ls -la ${PACKAGE_DIR}/ || true
 
+      - name: Find all IPK files
+        working-directory: openwrt-sdk
+        run: |
+          find bin/packages -name "*.ipk" -type f
+          find bin/targets -name "*.ipk" -type f 2>/dev/null || true
+
       - name: Upload packages
         uses: actions/upload-artifact@v6
         with:
