@@ -20,7 +20,7 @@ GO_PKG:=github.com/dnscrypt/dnscrypt-proxy
 GO_PKG_BUILD_PKG:=$(GO_PKG)/dnscrypt-proxy
 
 include $(INCLUDE_DIR)/package.mk
-include ../../lang/golang/golang-package.mk
+include $(TOPDIR)/feeds/packages/lang/golang/golang-package.mk
 
 define Package/dnscrypt-proxy
   SECTION:=net
