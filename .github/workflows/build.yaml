@@ -36,16 +36,6 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a golang
           ./scripts/feeds uninstall dnscrypt-proxy
-          
-      - name: Update Golang to 1.24
-        working-directory: openwrt-sdk
-        run: |
-          # Обновляем golang feed до последней версии
-          cd feeds/packages
-          git pull origin master
-          cd ../..
-          ./scripts/feeds update packages
-          ./scripts/feeds install -f golang
 
       - name: Link package
         run: |
