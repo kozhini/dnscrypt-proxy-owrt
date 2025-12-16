@@ -37,6 +37,12 @@ jobs:
           ./scripts/feeds install -a golang
           ./scripts/feeds uninstall dnscrypt-proxy
 
+      - name: Force build Go host tools (1.24)
+        working-directory: openwrt-sdk
+        run: |
+          make package/golang/host/compile V=s 
+   
+
       - name: Link package
         run: |
           mkdir -p openwrt-sdk/package/feeds
