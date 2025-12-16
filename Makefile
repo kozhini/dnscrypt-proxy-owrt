@@ -8,6 +8,8 @@ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/DNSCrypt/dnscrypt-proxy/tar.gz/$(PKG_VERSION)?
 PKG_HASH:=57da91dd2a3992a1528e764bcfe9b48088c63c933c0c571a2cac3d27ac8c7546
 
+GO_VERSION:=1.24
+
 PKG_MAINTAINER:=Your Name <your@email.com>
 PKG_LICENSE:=ISC
 PKG_LICENSE_FILES:=LICENSE
