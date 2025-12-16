@@ -40,7 +40,7 @@ jobs:
       - name: Force build Go host tools (1.24)
         working-directory: openwrt-sdk
         run: |
-          make package/golang/host/compile V=s 
+          make package/golang/host/install V=s 
    
 
       - name: Link package
