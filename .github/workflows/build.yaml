@@ -14,7 +14,7 @@ jobs:
       
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
@@ -35,11 +35,12 @@ jobs:
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a golang
+          ./scripts/feeds uninstall dnscrypt-proxy
 
       - name: Link package
         run: |
-          mkdir -p openwrt-sdk/package/custom
-          ln -s $GITHUB_WORKSPACE openwrt-sdk/package/custom/dnscrypt-proxy
+          mkdir -p openwrt-sdk/package/feeds
+          ln -s $GITHUB_WORKSPACE openwrt-sdk/package/feeds/dnscrypt-proxy
 
       - name: Configure
         working-directory: openwrt-sdk
@@ -60,14 +61,8 @@ jobs:
           echo "package_dir=${PACKAGE_DIR}" >> $GITHUB_OUTPUT
           ls -la ${PACKAGE_DIR}/ || true
 
-      - name: Find all IPK files
-        working-directory: openwrt-sdk
-        run: |
-          find bin/packages -name "*.ipk" -type f
-          find bin/targets -name "*.ipk" -type f 2>/dev/null || true
-
       - name: Upload packages
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4
         with:
           name: dnscrypt-proxy-${{ env.OPENWRT_VERSION }}-${{ env.ARCH }}
           path: openwrt-sdk/bin/packages/${{ env.ARCH }}/custom/*.ipk
