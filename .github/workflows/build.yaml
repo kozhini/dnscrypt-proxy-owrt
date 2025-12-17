@@ -11,6 +11,8 @@ jobs:
       TARGET: "mediatek"
       SUBTARGET: "filogic"
       ARCH: "aarch64_cortex-a53"
+      GOTOOLCHAIN: local
+      GOENV: off
       
     steps:
       - name: Checkout
