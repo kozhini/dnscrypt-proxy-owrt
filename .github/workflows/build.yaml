@@ -11,7 +11,7 @@ jobs:
       TARGET: "mediatek"
       SUBTARGET: "filogic"
       ARCH: "aarch64_cortex-a53"
-      GO_VER: "1.25.5"
+      GO_VER: "1.25.5"    # ← КОРРЕКТНО
           
     steps:
       - name: Checkout
@@ -52,18 +52,17 @@ jobs:
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a golang
-          ./scripts/feeds uninstall dnscrypt-proxy
+          ./scripts/feeds uninstall dnscrypt-proxy dnscrypt-proxy2
 
       - name: Link Local Source to SDK
         run: |
-          # Копируем ВЕСЬ твой текущий репозиторий (включая go.mod и папку dnscrypt-proxy)
-          mkdir -p openwrt-sdk/package/dnscrypt-proxy
-          rsync -av . openwrt-sdk/package/dnscrypt-proxy/ --exclude openwrt-sdk --exclude .git
+          mkdir -p openwrt-sdk/package/dnscrypt-proxy2
+          rsync -av . openwrt-sdk/package/dnscrypt-proxy2/ --exclude openwrt-sdk --exclude .git
 
       - name: Configure
         working-directory: openwrt-sdk
         run: |
-          echo "CONFIG_PACKAGE_dnscrypt-proxy=m" > .config
+          echo "CONFIG_PACKAGE_dnscrypt-proxy2=m" > .config
           echo "CONFIG_USE_EXTERNAL_GO=y" >> .config
           echo "CONFIG_EXTERNAL_GO_DIRECTORY=\"/usr/local/go\"" >> .config
           make defconfig
@@ -71,8 +70,7 @@ jobs:
       - name: Compile package
         working-directory: openwrt-sdk
         run: |
-          # Используем внутренний линкер, arm64 и внешний Go
-          make package/dnscrypt-proxy/compile V=s -j$(nproc) \
+          make package/dnscrypt-proxy2/compile V=s -j$(nproc) \
             GO_VERSION="${{ env.GO_VER }}" \
             GO_BIN="/usr/local/go/bin/go" \
             GOROOT="/usr/local/go" \
@@ -84,7 +82,6 @@ jobs:
       - name: Upload packages
         uses: actions/upload-artifact@v4
         with:
-          name: dnscrypt-proxy-24.10.4-${{ env.ARCH }}
-          # Исправлено: имя папки openwrt-sdk и путь до base
-          path: openwrt-sdk/bin/packages/${{ env.ARCH }}/base/dnscrypt-proxy*.ipk
+          name: dnscrypt-proxy2-24.10.4-${{ env.ARCH }}
+          path: openwrt-sdk/bin/packages/${{ env.ARCH }}/base/dnscrypt-proxy2*.ipk
           if-no-files-found: error
