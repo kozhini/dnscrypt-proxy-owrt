@@ -36,45 +36,53 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a golang
           ./scripts/feeds uninstall dnscrypt-proxy
-          
-      - name: Install Go 1.24 manually
-        run: |
-          wget -q https://go.dev/dl/go1.25.5.linux-amd64.tar.gz
-          sudo tar -C /usr/local -xzf go1.25.5.linux-amd64.tar.gz
-          echo "/usr/local/go/bin" >> $GITHUB_PATH
-          /usr/local/go/bin/go version
-    
-      - name: Override SDK Go
-        working-directory: openwrt-sdk
-        run: |
-          mkdir -p staging_dir/host/bin
-          ln -sf /usr/local/go/bin/go staging_dir/host/bin/go
-          ln -sf /usr/local/go/bin/gofmt staging_dir/host/bin/gofmt
-          staging_dir/host/bin/go version
 
       - name: Link package
         run: |
-          mkdir -p openwrt-sdk/package/feeds
-          ln -s $GITHUB_WORKSPACE openwrt-sdk/package/feeds/dnscrypt-proxy
+          # Привязываем ваш текущий репозиторий как пакет в SDK
+          ln -s $GITHUB_WORKSPACE openwrt-sdk/package/dnscrypt-proxy
+
+      - name: Install Go 1.24+ manually
+        run: |
+          wget -q https://go.dev/dl/go1.24.0.linux-amd64.tar.gz
+          sudo tar -C /usr/local -xzf go1.24.0.linux-amd64.tar.gz
+          echo "/usr/local/go/bin" >> $GITHUB_PATH
+          echo "GOROOT=/usr/local/go" >> $GITHUB_ENV
+
+      - name: Override SDK Go
+        working-directory: openwrt-sdk
+        run: |
+          # Создаем структуру директорий заранее
+          mkdir -p staging_dir/hostpkg/bin
+          mkdir -p staging_dir/host/bin
+          # Линкуем Go везде, где SDK может его искать
+          ln -sf /usr/local/go/bin/go staging_dir/hostpkg/bin/go
+          ln -sf /usr/local/go/bin/gofmt staging_dir/hostpkg/bin/gofmt
+          ln -sf /usr/local/go/bin/go staging_dir/host/bin/go
 
       - name: Configure
         working-directory: openwrt-sdk
         run: |
           echo "CONFIG_PACKAGE_dnscrypt-proxy=m" > .config
+          # Добавляем принудительное использование внешнего Go в конфиг
+          echo "CONFIG_USE_EXTERNAL_GO=y" >> .config
+          echo "CONFIG_EXTERNAL_GO_DIRECTORY=\"/usr/local/go\"" >> .config
           make defconfig
 
       - name: Compile package
         working-directory: openwrt-sdk
         run: |
-          make package/dnscrypt-proxy/compile V=s -j$(nproc)
+          # Компилируем, явно указывая пути к внешнему Go
+          make package/dnscrypt-proxy/compile V=s -j$(nproc) \
+            HOST_GO_BIN=/usr/local/go/bin/go \
+            GO_BIN=/usr/local/go/bin/go
 
       - name: Find all IPK files
         working-directory: openwrt-sdk
-        run: |
-          find bin/packages -name "*.ipk" -type f
+        run: find bin/packages -name "*.ipk" -type f
           
       - name: Upload packages
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4 # Рекомендую v4, v6 еще официально не вышла как стабильная
         with:
           name: dnscrypt-proxy-${{ env.OPENWRT_VERSION }}-${{ env.ARCH }}
           path: openwrt-sdk/bin/packages/${{ env.ARCH }}/packages/dnscrypt-proxy*.ipk
