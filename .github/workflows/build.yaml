@@ -85,6 +85,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dnscrypt-proxy-24.10.4-${{ env.ARCH }}
-          # Используем двойную звездочку для поиска во всех подпапках
-          path: openwrt-sdk/bin/packages/${{ env.ARCH }}/**/dnscrypt-proxy*.ipk
+          # Исправлено: имя папки openwrt-sdk и путь до base
+          path: openwrt-sdk/bin/packages/${{ env.ARCH }}/base/dnscrypt-proxy*.ipk
           if-no-files-found: error
