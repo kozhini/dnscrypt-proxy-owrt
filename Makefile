@@ -12,7 +12,8 @@ PKG_MAINTAINER:=Your Name <your@email.com>
 PKG_LICENSE:=ISC
 PKG_LICENSE_FILES:=LICENSE
 
-PKG_BUILD_DEPENDS:=golang/host
+# Мы убираем зависимость от golang/host, так как используем внешний Go
+PKG_BUILD_DEPENDS:=
 PKG_BUILD_PARALLEL:=1
 PKG_BUILD_FLAGS:=no-mips16
 
@@ -21,6 +22,9 @@ GO_PKG_BUILD_PKG:=$(GO_PKG)/dnscrypt-proxy
 
 include $(INCLUDE_DIR)/package.mk
 include $(TOPDIR)/feeds/packages/lang/golang/golang-package.mk
+
+# Переопределяем версию для внутреннего использования golang-package.mk
+GO_VERSION:=1.25.5
 
 define Package/dnscrypt-proxy
   SECTION:=net
