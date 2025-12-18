@@ -46,6 +46,7 @@ endef
 
 # Принудительно отключаем CGO для совместимости musl/glibc
 GO_PKG_VARS += CGO_ENABLED=0
+GO_PKG_LDFLAGS += -linkmode internal -s -w
 
 define Build/Compile
 	$(call GoPackage/Build/Compile)
