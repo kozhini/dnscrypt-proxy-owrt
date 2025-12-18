@@ -4,15 +4,11 @@ PKG_NAME:=dnscrypt-proxy
 PKG_VERSION:=2.1.15
 PKG_RELEASE:=1
 
-PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=https://codeload.github.com/DNSCrypt/dnscrypt-proxy/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=57da91dd2a3992a1528e764bcfe9b48088c63c933c0c571a2cac3d27ac8c7546
-
+# Эти переменные не важны для локальной сборки, но нужны для структуры
 PKG_MAINTAINER:=Your Name <your@email.com>
 PKG_LICENSE:=ISC
 PKG_LICENSE_FILES:=LICENSE
 
-# Критично: обнуляем зависимости, чтобы не собирать встроенный Go 1.23
 PKG_BUILD_DEPENDS:=
 PKG_BUILD_PARALLEL:=1
 PKG_BUILD_FLAGS:=no-mips16
@@ -23,8 +19,8 @@ GO_PKG_BUILD_PKG:=$(GO_PKG)/dnscrypt-proxy
 include $(INCLUDE_DIR)/package.mk
 include $(TOPDIR)/feeds/packages/lang/golang/golang-package.mk
 
-# Переопределяем версию для внутренних проверок макросов
 GO_VERSION:=1.25.5
+GO_PKG_LDFLAGS:=-linkmode internal -s -w
 
 define Package/dnscrypt-proxy
   SECTION:=net
@@ -35,21 +31,25 @@ define Package/dnscrypt-proxy
   DEPENDS:=$(GO_ARCH_DEPENDS) +ca-bundle
 endef
 
-define Package/dnscrypt-proxy/description
-  A flexible DNS proxy, with support for modern encrypted DNS protocols
-  such as DNSCrypt v2, DNS-over-HTTPS and Anonymized DNSCrypt.
+# ПРИНУДИТЕЛЬНАЯ СБОРКА ИЗ ЛОКАЛЬНЫХ ИСХОДНИКОВ
+define Build/Prepare
+	mkdir -p $(PKG_BUILD_DIR)
+	$(CP) ./dnscrypt-proxy* $(PKG_BUILD_DIR)/
+	$(CP) ./go.* $(PKG_BUILD_DIR)/
+	$(CP) ./vendor $(PKG_BUILD_DIR)/ || true
 endef
-
-define Package/dnscrypt-proxy/conffiles
-/etc/dnscrypt-proxy/dnscrypt-proxy.toml
-endef
-
-# Принудительно отключаем CGO для совместимости musl/glibc
-GO_PKG_VARS += CGO_ENABLED=0
-GO_PKG_LDFLAGS += -linkmode internal -s -w
 
 define Build/Compile
-	$(call GoPackage/Build/Compile)
+	(cd $(PKG_BUILD_DIR); \
+		GOOS=linux \
+		GOARCH=$(GO_ARCH) \
+		GOROOT=$(GOROOT) \
+		CGO_ENABLED=0 \
+		$(GO_BIN) build -v \
+			-ldflags="$(GO_PKG_LDFLAGS)" \
+			-o $(GO_PKG_BUILD_BIN_DIR)/dnscrypt-proxy \
+			./dnscrypt-proxy \
+	)
 endef
 
 define Package/dnscrypt-proxy/install
@@ -57,11 +57,9 @@ define Package/dnscrypt-proxy/install
 	$(INSTALL_BIN) $(GO_PKG_BUILD_BIN_DIR)/dnscrypt-proxy $(1)/usr/sbin/
 	
 	$(INSTALL_DIR) $(1)/etc/dnscrypt-proxy
-	$(INSTALL_CONF) $(PKG_BUILD_DIR)/dnscrypt-proxy/example-dnscrypt-proxy.toml $(1)/etc/dnscrypt-proxy/dnscrypt-proxy.toml
-	
-	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) ./files/dnscrypt-proxy.init $(1)/etc/init.d/dnscrypt-proxy
+	# Ищем конфиг в локальных исходниках
+	[ -f $(PKG_BUILD_DIR)/dnscrypt-proxy/example-dnscrypt-proxy.toml ] && \
+		$(INSTALL_CONF) $(PKG_BUILD_DIR)/dnscrypt-proxy/example-dnscrypt-proxy.toml $(1)/etc/dnscrypt-proxy/dnscrypt-proxy.toml || true
 endef
 
-$(eval $(call GoBinPackage,dnscrypt-proxy))
 $(eval $(call BuildPackage,dnscrypt-proxy))
