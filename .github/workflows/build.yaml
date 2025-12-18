@@ -15,7 +15,7 @@ jobs:
           
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
@@ -26,56 +26,42 @@ jobs:
 
       - name: Download OpenWrt SDK
         run: |
-          # Используем актуальную ссылку для 24.10.4
           SDK_URL="https://downloads.openwrt.org/releases/24.10.4/targets/mediatek/filogic/openwrt-sdk-24.10.4-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64.tar.zst"
-          
-          echo "Downloading SDK from $SDK_URL..."
-          # Добавляем флаги --retry и --no-check-certificate на случай проблем с сетью/сертификатами
-          wget --quiet --tries=3 --retry-connrefused --no-check-certificate "$SDK_URL" -O sdk.tar.zst
-          
-          if [ ! -f sdk.tar.zst ]; then
-            echo "Error: Failed to download SDK"
-            exit 1
-          fi
-          
-          echo "Extracting SDK..."
+          wget -q "$SDK_URL" -O sdk.tar.zst
           tar --zstd -xf sdk.tar.zst
-          # Переименовываем папку для удобства (убираем длинный хвост)
           mv openwrt-sdk-24.10.4-mediatek-filogic* openwrt-sdk
-
-      - name: Update and install feeds
-        working-directory: openwrt-sdk
-        run: |
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a golang
-          # Удаляем версию из фидов, чтобы использовать наш локальный код из репозитория
-          ./scripts/feeds uninstall dnscrypt-proxy
 
       - name: Install Go ${{ env.GO_VER }}
         run: |
           wget -q https://go.dev/dl/go${{ env.GO_VER }}.linux-amd64.tar.gz
           sudo tar -C /usr/local -xzf go${{ env.GO_VER }}.linux-amd64.tar.gz
           echo "/usr/local/go/bin" >> $GITHUB_PATH
-          echo "GOROOT=/usr/local/go" >> $GITHUB_ENV
-
-      - name: Link package
-        run: |
-          # Связываем текущий репозиторий с папкой пакетов SDK
-          mkdir -p openwrt-sdk/package/dnscrypt-proxy
-          cp -r ./* openwrt-sdk/package/dnscrypt-proxy/
+          # Не устанавливаем системный GOROOT, чтобы не путать компилятор SDK
 
       - name: Prepare SDK environment (Bypass host-go build)
         working-directory: openwrt-sdk
         run: |
-          # Создаем пути, где SDK будет искать Go
           mkdir -p staging_dir/hostpkg/bin
           mkdir -p staging_dir/host/bin
+          # Линкуем наш Go в структуру SDK
           ln -sf /usr/local/go/bin/go staging_dir/hostpkg/bin/go
           ln -sf /usr/local/go/bin/gofmt staging_dir/hostpkg/bin/gofmt
           ln -sf /usr/local/go/bin/go staging_dir/host/bin/go
-          
-          # Устанавливаем метку, что пакет golang (host) уже "собран"
+          # Создаем метку, что пакет golang собран
           touch staging_dir/hostpkg/.built_golang_host
+
+      - name: Update and install feeds
+        working-directory: openwrt-sdk
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a golang
+          ./scripts/feeds uninstall dnscrypt-proxy
+
+      - name: Link package
+        run: |
+          mkdir -p openwrt-sdk/package/dnscrypt-proxy
+          # Используем rsync для безопасного копирования без рекурсии
+          rsync -av . openwrt-sdk/package/dnscrypt-proxy/ --exclude openwrt-sdk --exclude sdk.tar.zst --exclude .git
 
       - name: Configure
         working-directory: openwrt-sdk
@@ -88,20 +74,19 @@ jobs:
       - name: Compile package
         working-directory: openwrt-sdk
         run: |
-          # Принудительно передаем все пути к Go 1.25.5 в make
+          # Явно передаем все параметры, перекрывая внутренние механизмы SDK
           make package/dnscrypt-proxy/compile V=s -j$(nproc) \
-            GO_VERSION="1.25.5" \
+            GO_VERSION="${{ env.GO_VER }}" \
             GO_BIN="/usr/local/go/bin/go" \
             GOROOT="/usr/local/go" \
-            GO_HOST_OS_VARS="GOOS=linux GOARCH=amd64 GOROOT=/usr/local/go"
+            HOST_GO_BIN="/usr/local/go/bin/go"
 
       - name: Find IPK files
         working-directory: openwrt-sdk
         run: find bin/packages -name "*.ipk"
-
+          
       - name: Upload packages
         uses: actions/upload-artifact@v4
         with:
-          name: dnscrypt-proxy-${{ env.OPENWRT_VERSION }}-${{ env.ARCH }}
+          name: dnscrypt-proxy-24.10.4-${{ env.ARCH }}
           path: openwrt-sdk/bin/packages/${{ env.ARCH }}/packages/dnscrypt-proxy*.ipk
-          if-no-files-found: error
