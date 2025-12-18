@@ -78,8 +78,13 @@ jobs:
             GOROOT="/usr/local/go" \
             GO_ARCH="arm64"
 
+      - name: Debug find
+        run: find openwrt-sdk/bin/packages -name "dnscrypt-proxy*.ipk"
+
       - name: Upload packages
         uses: actions/upload-artifact@v4
         with:
           name: dnscrypt-proxy-24.10.4-${{ env.ARCH }}
-          path: openwrt-sdk/bin/packages/${{ env.ARCH }}/packages/dnscrypt-proxy*.ipk
+          # Используем двойную звездочку для поиска во всех подпапках
+          path: openwrt-sbin/bin/packages/${{ env.ARCH }}/**/dnscrypt-proxy*.ipk
+          if-no-files-found: error
