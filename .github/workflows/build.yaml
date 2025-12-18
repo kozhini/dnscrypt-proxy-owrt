@@ -26,10 +26,22 @@ jobs:
 
       - name: Download OpenWrt SDK
         run: |
-          SDK_URL="https://downloads.openwrt.org/releases/${OPENWRT_VERSION}/targets/${TARGET}/${SUBTARGET}/openwrt-sdk-${OPENWRT_VERSION}-${TARGET}/${SUBTARGET}_gcc-13.3.0_musl.Linux-x86_64.tar.zst"
-          wget -q $SDK_URL -O sdk.tar.zst
+          # Используем актуальную ссылку для 24.10.4
+          SDK_URL="https://downloads.openwrt.org/releases/24.10.4/targets/mediatek/filogic/openwrt-sdk-24.10.4-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64.tar.zst"
+          
+          echo "Downloading SDK from $SDK_URL..."
+          # Добавляем флаги --retry и --no-check-certificate на случай проблем с сетью/сертификатами
+          wget --quiet --tries=3 --retry-connrefused --no-check-certificate "$SDK_URL" -O sdk.tar.zst
+          
+          if [ ! -f sdk.tar.zst ]; then
+            echo "Error: Failed to download SDK"
+            exit 1
+          fi
+          
+          echo "Extracting SDK..."
           tar --zstd -xf sdk.tar.zst
-          mv openwrt-sdk-* openwrt-sdk
+          # Переименовываем папку для удобства (убираем длинный хвост)
+          mv openwrt-sdk-24.10.4-mediatek-filogic* openwrt-sdk
 
       - name: Update and install feeds
         working-directory: openwrt-sdk
