@@ -62,8 +62,17 @@ define Package/dnscrypt-proxy2/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/dnscrypt-proxy-bin $(1)/usr/sbin/dnscrypt-proxy2
 	
 	$(INSTALL_DIR) $(1)/etc/dnscrypt-proxy2
-	$(INSTALL_CONF) $(PKG_BUILD_DIR)/example-dnscrypt-proxy.toml \
-		$(1)/etc/dnscrypt-proxy2/dnscrypt-proxy.toml
+	# ИСПРАВЛЕНО: Ищем конфиг в возможных местах
+	if [ -f $(PKG_BUILD_DIR)/example-dnscrypt-proxy.toml ]; then \
+		$(INSTALL_CONF) $(PKG_BUILD_DIR)/example-dnscrypt-proxy.toml \
+			$(1)/etc/dnscrypt-proxy2/dnscrypt-proxy.toml; \
+	elif [ -f $(PKG_BUILD_DIR)/dnscrypt-proxy/example-dnscrypt-proxy.toml ]; then \
+		$(INSTALL_CONF) $(PKG_BUILD_DIR)/dnscrypt-proxy/example-dnscrypt-proxy.toml \
+			$(1)/etc/dnscrypt-proxy2/dnscrypt-proxy.toml; \
+	else \
+		echo "ERROR: example-dnscrypt-proxy.toml not found!"; \
+		exit 1; \
+	fi
 endef
 
 $(eval $(call BuildPackage,dnscrypt-proxy2))
