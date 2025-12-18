@@ -74,12 +74,12 @@ jobs:
       - name: Compile package
         working-directory: openwrt-sdk
         run: |
-          # Явно передаем все параметры, перекрывая внутренние механизмы SDK
           make package/dnscrypt-proxy/compile V=s -j$(nproc) \
             GO_VERSION="${{ env.GO_VER }}" \
             GO_BIN="/usr/local/go/bin/go" \
             GOROOT="/usr/local/go" \
-            HOST_GO_BIN="/usr/local/go/bin/go"
+            HOST_GO_BIN="/usr/local/go/bin/go" \
+            CGO_ENABLED=0
 
       - name: Find IPK files
         working-directory: openwrt-sdk
