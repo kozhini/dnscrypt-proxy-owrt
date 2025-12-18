@@ -1,6 +1,6 @@
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=dnscrypt-proxy
+PKG_NAME:=dnscrypt-proxy2
 PKG_VERSION:=2.1.15
 PKG_RELEASE:=1
 
@@ -58,8 +58,8 @@ define Package/dnscrypt-proxy/install
 	
 	$(INSTALL_DIR) $(1)/etc/dnscrypt-proxy
 	# Ищем конфиг в локальных исходниках
-	[ -f $(PKG_BUILD_DIR)/dnscrypt-proxy/example-dnscrypt-proxy.toml ] && \
-		$(INSTALL_CONF) $(PKG_BUILD_DIR)/dnscrypt-proxy/example-dnscrypt-proxy.toml $(1)/etc/dnscrypt-proxy/dnscrypt-proxy.toml || true
+	[ -f $(PKG_BUILD_DIR)/dnscrypt-proxy2/example-dnscrypt-proxy.toml ] && \
+		$(INSTALL_CONF) $(PKG_BUILD_DIR)/dnscrypt-proxy/example-dnscrypt-proxy.toml $(1)/etc/dnscrypt-proxy2/dnscrypt-proxy.toml || true
 endef
 
 $(eval $(call BuildPackage,dnscrypt-proxy))
