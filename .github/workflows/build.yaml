@@ -11,12 +11,10 @@ jobs:
       TARGET: "mediatek"
       SUBTARGET: "filogic"
       ARCH: "aarch64_cortex-a53"
-      GOTOOLCHAIN: local
-      GOENV: off
       
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
@@ -42,9 +40,10 @@ jobs:
       - name: Update Golang to 1.24+
         working-directory: openwrt-sdk
         run: |
+          # Используем openwrt-24.10 branch (стабильный Go 1.23.x)
           cd feeds/packages
           git fetch origin
-          git reset --hard origin/master
+          git reset --hard origin/openwrt-24.10
           cd ../..
           ./scripts/feeds update packages
           ./scripts/feeds install -f golang
