@@ -86,5 +86,5 @@ jobs:
         with:
           name: dnscrypt-proxy-24.10.4-${{ env.ARCH }}
           # Используем двойную звездочку для поиска во всех подпапках
-          path: openwrt-sbin/bin/packages/${{ env.ARCH }}/**/dnscrypt-proxy*.ipk
+          path: openwrt-sdk/bin/packages/${{ env.ARCH }}/**/dnscrypt-proxy*.ipk
           if-no-files-found: error
