@@ -30,7 +30,7 @@ include $(INCLUDE_DIR)/package.mk
 include ../../lang/golang/golang-package.mk
 
 GO_MOD_ARGS:=
-GO_PKG_BUILD_VARS+= GO111MODULE=off
+#GO_PKG_BUILD_VARS+= GO111MODULE=off
 GO_PKG_INSTALL_EXTRA:= dnscrypt-proxy/static/
 
 define Package/dnscrypt-proxy2
