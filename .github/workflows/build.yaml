@@ -73,6 +73,3 @@ jobs:
           name: dnscrypt-proxy2-24.10.4-${{ env.ARCH }}
           path: openwrt-sdk/bin/packages/${{ env.ARCH }}/base/dnscrypt-proxy2*.ipk
           if-no-files-found: error
-
-          path: openwrt-sdk/bin/packages/${{ env.ARCH }}/base/dnscrypt-proxy2*.ipk
-          if-no-files-found: error
