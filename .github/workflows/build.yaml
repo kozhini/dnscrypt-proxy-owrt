@@ -65,7 +65,7 @@ jobs:
             GO_VERSION="${{ env.GO_VER }}" \
             GO_BIN="/usr/local/go/bin/go" \
             GOROOT="/usr/local/go" \
-            GO_ARCH="arm64"
+            GO_ARCH="aarch64_cortex-a53"   # ← ИСПРАВЛЕНО: вместо "arm64"
 
       - name: Upload packages
         uses: actions/upload-artifact@v4
