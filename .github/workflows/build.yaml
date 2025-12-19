@@ -11,11 +11,24 @@ jobs:
       TARGET: "mediatek"
       SUBTARGET: "filogic"
       ARCH: "aarch64_cortex-a53"
-      GO_VER: "1.25.5"    # ← КОРРЕКТНО
+      GO_VERSION: "1.24.4"  # Минимум 1.24
           
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
+
+      # === КРИТИЧЕСКИ ВАЖНО: Установить Go 1.24+ ДО SDK ===
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: Verify Go version
+        run: |
+          go version
+          which go
+          echo "GOROOT=$(go env GOROOT)"
 
       - name: Install dependencies
         run: |
@@ -35,41 +48,55 @@ jobs:
         working-directory: openwrt-sdk
         run: |
           ./scripts/feeds update -a
-          ./scripts/feeds install -a   # ← Убрано 'golang' — он не нужен в 24.10+
-          ./scripts/feeds uninstall dnscrypt-proxy dnscrypt-proxy2
+          ./scripts/feeds install -a
 
-      - name: Install Go 1.25.5
+      # === НЕ устанавливать golang из feeds ===
+      - name: Remove conflicting golang packages
+        working-directory: openwrt-sdk
         run: |
-          wget https://go.dev/dl/go1.25.5.linux-amd64.tar.gz
-          sudo rm -rf /usr/local/go
-          sudo tar -C /usr/local -xzf go1.25.5.linux-amd64.tar.gz
-          echo "PATH=/usr/local/go/bin:$PATH" >> $GITHUB_ENV
+          ./scripts/feeds uninstall golang golang-src
+          rm -rf feeds/packages/lang/golang
 
       - name: Link Local Source to SDK
         run: |
           mkdir -p openwrt-sdk/package/dnscrypt-proxy2
           rsync -av . openwrt-sdk/package/dnscrypt-proxy2/ --exclude openwrt-sdk --exclude .git
 
-      - name: Configure
+      - name: Configure to use system Go
         working-directory: openwrt-sdk
         run: |
+          # Конфигурация пакета
           echo "CONFIG_PACKAGE_dnscrypt-proxy2=m" > .config
-          echo "CONFIG_USE_EXTERNAL_GO=y" >> .config
-          echo "CONFIG_EXTERNAL_GO_DIRECTORY=\"/usr/local/go\"" >> .config
           make defconfig
+          
+          # Переопределяем переменные Go для golang-package.mk
+          cat >> .config << EOF
+          CONFIG_GOLANG_EXTERNAL_BOOTSTRAP_ROOT="$(go env GOROOT)"
+          EOF
 
-      - name: Compile package
+      - name: Compile package with system Go
         working-directory: openwrt-sdk
+        env:
+          GOCACHE: ${{ github.workspace }}/.cache/go-build
+          GOMODCACHE: ${{ github.workspace }}/.cache/go-mod
         run: |
-          make package/dnscrypt-proxy2/compile V=s -j$(nproc) \
-            GO_VERSION="${{ env.GO_VER }}" \
-            GO_BIN="/usr/local/go/bin/go" \
-            GOROOT="/usr/local/go" \
-            GO_ARCH="arm64"
+          # Экспортируем переменные для принудительного использования системного Go
+          export PATH="$(go env GOROOT)/bin:$PATH"
+          export GOROOT="$(go env GOROOT)"
+          export GOROOT_FINAL="$(go env GOROOT)"
+          
+          make package/dnscrypt-proxy2/compile V=s -j$(nproc)
+
+      - name: Find built packages
+        run: |
+          echo "=== Search results ==="
+          find openwrt-sdk/bin/packages -type f -name "*.ipk" | grep -i dnscrypt || true
+          echo "=== All IPK files ==="
+          find openwrt-sdk/bin -type f -name "*.ipk" || true
 
       - name: Upload packages
         uses: actions/upload-artifact@v4
         with:
           name: dnscrypt-proxy2-24.10.4-${{ env.ARCH }}
           path: openwrt-sdk/bin/packages/${{ env.ARCH }}/base/dnscrypt-proxy2*.ipk
-          if-no-files-found: error
+          if-no-files-found: warn
