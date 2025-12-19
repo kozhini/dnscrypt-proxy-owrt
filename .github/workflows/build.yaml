@@ -15,7 +15,7 @@ jobs:
           
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install dependencies
         run: |
@@ -35,22 +35,15 @@ jobs:
         working-directory: openwrt-sdk
         run: |
           ./scripts/feeds update -a
-          ./scripts/feeds install -a golang
+          ./scripts/feeds install -a   # ← Убрано 'golang' — он не нужен в 24.10+
           ./scripts/feeds uninstall dnscrypt-proxy dnscrypt-proxy2
 
-      - name: Patch golang feed (Go 1.25.5, no toolchain download)
-        working-directory: openwrt-sdk
+      - name: Install Go 1.25.5
         run: |
-          GOLANG_MK="feeds/packages/lang/golang/Makefile"
-
-          echo "Before:"
-          grep '^PKG_VERSION:=' "$GOLANG_MK"
-
-          sed -i 's/^PKG_VERSION:=.*/PKG_VERSION:=1.25.5/' "$GOLANG_MK"
-          sed -i '1iexport GOTOOLCHAIN=local\nexport GOENV=off\n' "$GOLANG_MK"
-
-          echo "After:"
-          head -n 5 "$GOLANG_MK"
+          wget https://go.dev/dl/go1.25.5.linux-amd64.tar.gz
+          sudo rm -rf /usr/local/go
+          sudo tar -C /usr/local -xzf go1.25.5.linux-amd64.tar.gz
+          echo "PATH=/usr/local/go/bin:$PATH" >> $GITHUB_ENV
 
       - name: Link Local Source to SDK
         run: |
@@ -74,12 +67,12 @@ jobs:
             GOROOT="/usr/local/go" \
             GO_ARCH="arm64"
 
-      - name: Debug find
-        run: find openwrt-sdk/bin/packages -name "dnscrypt-proxy*.ipk"
-
       - name: Upload packages
         uses: actions/upload-artifact@v4
         with:
           name: dnscrypt-proxy2-24.10.4-${{ env.ARCH }}
+          path: openwrt-sdk/bin/packages/${{ env.ARCH }}/base/dnscrypt-proxy2*.ipk
+          if-no-files-found: error
+
           path: openwrt-sdk/bin/packages/${{ env.ARCH }}/base/dnscrypt-proxy2*.ipk
           if-no-files-found: error
