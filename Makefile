@@ -27,10 +27,14 @@ PKG_BUILD_FLAGS:=no-mips16
 GO_PKG:=github.com/DNSCrypt/dnscrypt-proxy
 
 include $(INCLUDE_DIR)/package.mk
-include ../../lang/golang/golang-package.mk
+include $(INCLUDE_DIR)/golang-package.mk
 
-GO_MOD_ARGS:=
-#GO_PKG_BUILD_VARS+= GO111MODULE=off
+# Переменные окружения для Go (должны совпадать с патчем в build.yaml)
+GO_PKG_BUILD_VARS+= \
+	GO111MODULE=off \
+	GOTOOLCHAIN=local \
+	CGO_ENABLED=0
+
 GO_PKG_INSTALL_EXTRA:= dnscrypt-proxy/static/
 
 define Package/dnscrypt-proxy2
