@@ -57,7 +57,7 @@ jobs:
           rm -rf staging_dir/host/go* || true
           rm -rf dl/go*.tar.gz || true
           
-          GOLANG_PKG_MK="include/golang-package.mk"
+          GOLANG_PKG_MK="feeds/packages/lang/golang/golang-package.mk"
           
           if [ ! -f "$GOLANG_PKG_MK" ]; then
             echo "ERROR: golang-package.mk not found!"
@@ -118,7 +118,7 @@ jobs:
           make -n package/dnscrypt-proxy2/compile V=s 2>&1 | grep -E "(GOROOT|go version|go build)" | head -20 || true
           
           echo "=== Verify golang-package.mk patch ==="
-          head -n 10 include/golang-package.mk
+          head -n 15 feeds/packages/lang/golang/golang-package.mk
 
       - name: Compile package
         working-directory: openwrt-sdk
