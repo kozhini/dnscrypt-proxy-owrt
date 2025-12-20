@@ -2,6 +2,14 @@ name: Build OpenWrt Package
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'Makefile'
+      - 'files/**'
+      - '.github/workflows/build.yaml'
 
 jobs:
   build:
@@ -65,6 +73,23 @@ jobs:
           mkdir -p openwrt-sdk/package/dnscrypt-proxy2
           rsync -av --exclude=openwrt-sdk --exclude=.git --exclude=.github \
             . openwrt-sdk/package/dnscrypt-proxy2/
+          
+          echo "=== Downloading missing files from upstream ==="
+          mkdir -p openwrt-sdk/package/dnscrypt-proxy2/files
+          
+          if [ ! -f openwrt-sdk/package/dnscrypt-proxy2/files/blocked-names.txt ]; then
+            curl -sL -o openwrt-sdk/package/dnscrypt-proxy2/files/blocked-names.txt \
+              https://raw.githubusercontent.com/openwrt/packages/master/net/dnscrypt-proxy2/files/blocked-names.txt
+          fi
+          
+          if [ ! -f openwrt-sdk/package/dnscrypt-proxy2/files/dnscrypt-proxy.init ]; then
+            curl -sL -o openwrt-sdk/package/dnscrypt-proxy2/files/dnscrypt-proxy.init \
+              https://raw.githubusercontent.com/openwrt/packages/master/net/dnscrypt-proxy2/files/dnscrypt-proxy.init
+            chmod +x openwrt-sdk/package/dnscrypt-proxy2/files/dnscrypt-proxy.init
+          fi
+          
+          echo "=== Verify files exist ==="
+          ls -la openwrt-sdk/package/dnscrypt-proxy2/files/
           
           echo "=== Creating minimal golang-package.mk ==="
           cat > openwrt-sdk/package/dnscrypt-proxy2/golang-package.mk << 'EOFGOLANG'
@@ -131,3 +156,43 @@ jobs:
             openwrt-sdk/bin/packages/${{ env.ARCH }}/base/dnscrypt-proxy2*.ipk
             openwrt-sdk/bin/packages/${{ env.ARCH }}/packages/dnscrypt-proxy2*.ipk
           if-no-files-found: error
+
+      - name: Prepare release files
+        id: prepare_release
+        run: |
+          mkdir -p release
+          
+          # Копируем IPK файлы в release каталог
+          find openwrt-sdk/bin/packages -name "dnscrypt-proxy2*.ipk" -exec cp {} release/ \;
+          
+          # Генерируем имена файлов
+          cd release
+          for file in *.ipk; do
+            echo "Found: $file"
+          done
+          
+          # Создаём список файлов для release
+          ls -1 *.ipk > ../files.txt
+          
+          # Генерируем читаемый tag
+          TAG="v2.1.15-openwrt${{ env.OPENWRT_VERSION }}-$(date +%Y%m%d)"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Release tag: $TAG"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.prepare_release.outputs.tag }}
+          name: OpenWrt ${{ env.OPENWRT_VERSION }} - dnscrypt-proxy2 2.1.15
+          body: |
+            ## dnscrypt-proxy2 для OpenWrt ${{ env.OPENWRT_VERSION }}
+            
+            **Архитектура:** ${{ env.ARCH }}
+            **Go версия:** ${{ env.GO_VERSION }}
+            **dnscrypt-proxy версия:** 2.1.15
+            
+          files: release/*.ipk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
