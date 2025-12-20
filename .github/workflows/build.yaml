@@ -17,7 +17,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Go 1.24+
+      - name: Setup Go 1.25+
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -26,9 +26,7 @@ jobs:
       - name: Verify Go installation
         run: |
           go version
-          echo "Go binary: $(which go)"
           echo "GOROOT: $(go env GOROOT)"
-          echo "GOVERSION: $(go env GOVERSION)"
 
       - name: Install dependencies
         run: |
@@ -44,136 +42,67 @@ jobs:
           tar --zstd -xf sdk.tar.zst
           mv openwrt-sdk-24.10.4-mediatek-filogic* openwrt-sdk
 
-      - name: Update and install feeds
+      - name: Update feeds (without installing conflicting packages)
         working-directory: openwrt-sdk
         run: |
           ./scripts/feeds update -a
-          ./scripts/feeds install -a
+          
+          echo "=== Installing feeds EXCEPT golang and dnscrypt-proxy2 ==="
+          ./scripts/feeds install -a -p packages -d y
+          ./scripts/feeds uninstall golang dnscrypt-proxy2
+          
+          echo "=== Removing conflicting packages from feeds ==="
+          rm -rf feeds/packages/lang/golang
+          rm -rf feeds/packages/net/dnscrypt-proxy2
+          
+          echo "=== Verify removal ==="
+          ls feeds/packages/lang/ | grep golang || echo "✓ golang removed"
+          ls feeds/packages/net/ | grep dnscrypt || echo "✓ dnscrypt-proxy2 removed"
 
-      - name: Force golang-package.mk to use system Go 1.24+
-        working-directory: openwrt-sdk
+      - name: Copy local source to SDK
         run: |
-          echo "=== Removing SDK bundled Go ==="
-          rm -rf staging_dir/host/go* || true
-          rm -rf build_dir/hostpkg/go* || true
-          rm -rf dl/go*.tar.gz || true
+          echo "=== Copying local source ==="
+          mkdir -p openwrt-sdk/package/dnscrypt-proxy2
+          rsync -av --exclude=openwrt-sdk --exclude=.git --exclude=.github \
+            . openwrt-sdk/package/dnscrypt-proxy2/
           
-          GOLANG_PKG_MK="feeds/packages/lang/golang/golang-package.mk"
-          GOLANG_MAKEFILE="feeds/packages/lang/golang/Makefile"
-          
-          if [ ! -f "$GOLANG_PKG_MK" ]; then
-            echo "ERROR: golang-package.mk not found!"
-            exit 1
-          fi
-          
-          echo "=== Patching golang Makefile to prevent download ==="
-          cp "$GOLANG_MAKEFILE" "${GOLANG_MAKEFILE}.backup"
-          
-          cat > "$GOLANG_MAKEFILE" << 'MAKEFILEEOF'
-          include $(TOPDIR)/rules.mk
-          
-          PKG_NAME:=golang
-          PKG_VERSION:=1.25.5
-          PKG_RELEASE:=1
-          
-          PKG_BUILD_DIR:=$(BUILD_DIR)/golang-dummy
-          
-          include $(INCLUDE_DIR)/host-build.mk
-          include $(INCLUDE_DIR)/package.mk
-          
-          define Package/golang
-            SECTION:=lang
-            CATEGORY:=Languages
-            TITLE:=Go programming language (using system Go)
-            URL:=https://golang.org/
-          endef
-          
-          define Host/Prepare
-          	mkdir -p $(HOST_BUILD_DIR)
-          endef
-          
-          define Host/Configure
-          endef
-          
-          define Host/Compile
-          endef
-          
-          define Host/Install
-          	mkdir -p $(STAGING_DIR_HOSTPKG)/bin
-          	ln -sf $(shell which go) $(STAGING_DIR_HOSTPKG)/bin/go
-          	mkdir -p $(STAGING_DIR_HOSTPKG)/lib/go
-          	ln -sf $(shell go env GOROOT)/* $(STAGING_DIR_HOSTPKG)/lib/go/
-          endef
-          
-          $(eval $(call HostBuild))
-          MAKEFILEEOF
-          
-          echo "=== Patching golang-package.mk ==="
-          cp "$GOLANG_PKG_MK" "${GOLANG_PKG_MK}.backup"
-          
-          cat > "$GOLANG_PKG_MK" << 'PACKAGEEOF'
-          ifndef GOLANG_PKG_INCLUDED
-          GOLANG_PKG_INCLUDED:=1
+          echo "=== Creating minimal golang-package.mk ==="
+          cat > openwrt-sdk/package/dnscrypt-proxy2/golang-package.mk << 'EOFGOLANG'
+          # Minimal golang-package.mk using system Go 1.25+
           
           export GOTOOLCHAIN := local
           export GOROOT := $(shell go env GOROOT)
-          export GOPATH := $(shell go env GOPATH)
-          export GOCACHE := $(shell go env GOCACHE)
+          export GOPATH := $(BUILD_DIR)/gopath
+          export GOCACHE := $(BUILD_DIR)/go-cache
           export PATH := $(GOROOT)/bin:$(PATH)
           
-          GO_VERSION_MAJOR_MINOR := $(shell go version | sed -E 's/.*go([0-9]+\.[0-9]+).*/\1/')
-          GO_VERSION_PATCH := $(shell go version | sed -E 's/.*go([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
-          GO_OS := $(shell go env GOOS)
-          GO_ARCH := $(shell go env GOARCH)
-          GO_ARM := $(shell go env GOARM)
+          GO_PKG_BUILD_BIN_DIR := $(PKG_INSTALL_DIR)/usr/bin
           
-          GO_HOST_TARGET_DIR := $(GOROOT)
-          GO_HOST_TOOLCHAIN_DIR := $(GOROOT)
-          GO_HOST_WORK_DIR := $(BUILD_DIR_HOST)/go-work
+          define Build/Compile
+          	mkdir -p $(GO_PKG_BUILD_BIN_DIR)
+          	cd $(PKG_BUILD_DIR)/dnscrypt-proxy && \
+          	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 \
+          	go build -v -trimpath -ldflags="-s -w" \
+          	-o $(GO_PKG_BUILD_BIN_DIR)/dnscrypt-proxy
+          endef
           
-          GO_TAR_BALL :=
-          GO_INSTALL_DIR := $(GOROOT)
-          HOST_GO_ROOT := $(GOROOT)
+          define GoPackage/Package/Install/Bin
+          	$(INSTALL_DIR) $(1)/usr/bin
+          	$(INSTALL_BIN) $(GO_PKG_BUILD_BIN_DIR)/* $(1)/usr/bin/ 2>/dev/null || true
+          endef
+          EOFGOLANG
           
-          PACKAGEEOF
-          
-          tail -n +10 "${GOLANG_PKG_MK}.backup" >> "$GOLANG_PKG_MK" || true
-          echo "endif" >> "$GOLANG_PKG_MK"
-          
-          echo "=== Patches applied ==="
-          echo "--- golang Makefile (first 30 lines) ---"
-          head -n 30 "$GOLANG_MAKEFILE"
-          echo "--- golang-package.mk (first 30 lines) ---"
-          head -n 30 "$GOLANG_PKG_MK"
-
-      - name: Link Local Source to SDK
-        run: |
-          mkdir -p openwrt-sdk/package/dnscrypt-proxy2
-          rsync -av . openwrt-sdk/package/dnscrypt-proxy2/ \
-            --exclude openwrt-sdk \
-            --exclude .git \
-            --exclude .github
+          echo "=== Verify package version ==="
+          grep "PKG_VERSION" openwrt-sdk/package/dnscrypt-proxy2/Makefile
 
       - name: Configure package
         working-directory: openwrt-sdk
         run: |
           echo "CONFIG_PACKAGE_dnscrypt-proxy2=m" > .config
           make defconfig
-
-      - name: Verify Go environment before build
-        working-directory: openwrt-sdk
-        run: |
-          echo "=== System Go check ==="
-          which go
-          go version
-          go env GOROOT
-          go env GOVERSION
           
-          echo "=== Test: Can SDK see system Go? ==="
-          make -n package/dnscrypt-proxy2/compile V=s 2>&1 | grep -E "(GOROOT|go version|go build)" | head -20 || true
-          
-          echo "=== Verify golang-package.mk patch ==="
-          head -n 15 feeds/packages/lang/golang/golang-package.mk
+          echo "=== Verify package is from local source ==="
+          make package/dnscrypt-proxy2/prepare V=s 2>&1 | grep -E "(PKG_VERSION|PKG_SOURCE)" | head -5
 
       - name: Compile package
         working-directory: openwrt-sdk
@@ -182,19 +111,23 @@ jobs:
           GOMODCACHE: ${{ github.workspace }}/.cache/go-mod
           GOTOOLCHAIN: local
         run: |
+          echo "=== Starting compilation ==="
           make package/dnscrypt-proxy2/compile V=s -j$(nproc)
 
       - name: Find built packages
         run: |
-          echo "=== Searching for dnscrypt-proxy IPK ==="
-          find openwrt-sdk/bin/packages -type f -name "*dnscrypt*.ipk" -ls
+          echo "=== All IPK files ==="
+          find openwrt-sdk/bin/packages -type f -name "*.ipk" -ls
           
-          echo "=== All packages in target arch ==="
-          ls -lah openwrt-sdk/bin/packages/${{ env.ARCH }}/base/ || true
+          echo ""
+          echo "=== dnscrypt-proxy packages ==="
+          find openwrt-sdk/bin/packages -name "*dnscrypt*.ipk" -exec ls -lh {} \;
 
       - name: Upload packages
         uses: actions/upload-artifact@v4
         with:
           name: dnscrypt-proxy2-${{ env.OPENWRT_VERSION }}-${{ env.ARCH }}
-          path: openwrt-sdk/bin/packages/${{ env.ARCH }}/base/dnscrypt-proxy2*.ipk
+          path: |
+            openwrt-sdk/bin/packages/${{ env.ARCH }}/base/dnscrypt-proxy2*.ipk
+            openwrt-sdk/bin/packages/${{ env.ARCH }}/packages/dnscrypt-proxy2*.ipk
           if-no-files-found: error
