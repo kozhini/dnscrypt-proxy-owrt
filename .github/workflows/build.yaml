@@ -2,22 +2,48 @@ name: Build OpenWrt Package
 
 on:
   workflow_dispatch:
+    inputs:
+      openwrt_version:
+        description: "OpenWrt version"
+        required: true
+        default: "24.10.4"
+
+      target:
+        description: "Target"
+        required: true
+        default: "mediatek"
+
+      subtarget:
+        description: "Subtarget"
+        required: true
+        default: "filogic"
+
+      arch:
+        description: "Architecture"
+        required: true
+        default: "aarch64_cortex-a53"
+
+      go_version:
+        description: "Go version"
+        required: true
+        default: "1.25.5"
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     env:
-      OPENWRT_VERSION: "24.10.4"
-      TARGET: "mediatek"
-      SUBTARGET: "filogic"
-      ARCH: "aarch64_cortex-a53"
-      GO_VERSION: "1.25.5"
-          
+      OPENWRT_VERSION: ${{ inputs.openwrt_version }}
+      TARGET: ${{ inputs.target }}
+      SUBTARGET: ${{ inputs.subtarget }}
+      ARCH: ${{ inputs.arch }}
+      GO_VERSION: ${{ inputs.go_version }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup Go 1.25+
+      - name: Setup Go
         uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -37,10 +63,11 @@ jobs:
 
       - name: Download OpenWrt SDK
         run: |
-          SDK_URL="https://downloads.openwrt.org/releases/24.10.4/targets/mediatek/filogic/openwrt-sdk-24.10.4-mediatek-filogic_gcc-13.3.0_musl.Linux-x86_64.tar.zst"
+          SDK_URL="https://downloads.openwrt.org/releases/${OPENWRT_VERSION}/targets/${TARGET}/${SUBTARGET}/openwrt-sdk-${OPENWRT_VERSION}-${TARGET}-${SUBTARGET}_gcc-13.3.0_musl.Linux-x86_64.tar.zst"
+          echo "SDK_URL=${SDK_URL}"
           wget -q "$SDK_URL" -O sdk.tar.zst
           tar --zstd -xf sdk.tar.zst
-          mv openwrt-sdk-24.10.4-mediatek-filogic* openwrt-sdk
+          mv openwrt-sdk-${OPENWRT_VERSION}-${TARGET}-${SUBTARGET}* openwrt-sdk
 
       - name: Update feeds (without installing conflicting packages)
         working-directory: openwrt-sdk
@@ -85,7 +112,7 @@ jobs:
           
           echo "=== Creating minimal golang-package.mk ==="
           cat > openwrt-sdk/package/dnscrypt-proxy2/golang-package.mk << 'EOFGOLANG'
-          # Minimal golang-package.mk using system Go 1.25+
+          # Minimal golang-package.mk using system Go
           
           export GOTOOLCHAIN := local
           export GOROOT := $(shell go env GOROOT)
@@ -153,23 +180,11 @@ jobs:
         id: prepare_release
         run: |
           mkdir -p release
-          
-          # Копируем IPK файлы в release каталог
           find openwrt-sdk/bin/packages -name "dnscrypt-proxy2*.ipk" -exec cp {} release/ \;
-          
-          # Генерируем имена файлов
           cd release
-          for file in *.ipk; do
-            echo "Found: $file"
-          done
-          
-          # Создаём список файлов для release
           ls -1 *.ipk > ../files.txt
-          
-          # Генерируем читаемый tag
-          TAG="v2.1.15-openwrt${{ env.OPENWRT_VERSION }}-$(date +%Y%m%d)"
+          TAG="v2.1.15-openwrt${OPENWRT_VERSION}-$(date +%Y%m%d)"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "Release tag: $TAG"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -182,9 +197,6 @@ jobs:
             **Архитектура:** ${{ env.ARCH }}
             **Go версия:** ${{ env.GO_VERSION }}
             **dnscrypt-proxy версия:** 2.1.15
-            
           files: release/*.ipk
-          draft: false
-          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
