@@ -55,21 +55,66 @@ jobs:
         run: |
           echo "=== Removing SDK bundled Go ==="
           rm -rf staging_dir/host/go* || true
+          rm -rf build_dir/hostpkg/go* || true
           rm -rf dl/go*.tar.gz || true
           
           GOLANG_PKG_MK="feeds/packages/lang/golang/golang-package.mk"
+          GOLANG_MAKEFILE="feeds/packages/lang/golang/Makefile"
           
           if [ ! -f "$GOLANG_PKG_MK" ]; then
             echo "ERROR: golang-package.mk not found!"
-            find . -name "golang-package.mk"
             exit 1
           fi
           
-          echo "=== Patching $GOLANG_PKG_MK ==="
+          echo "=== Patching golang Makefile to prevent download ==="
+          cp "$GOLANG_MAKEFILE" "${GOLANG_MAKEFILE}.backup"
+          
+          cat > "$GOLANG_MAKEFILE" << 'MAKEFILEEOF'
+          include $(TOPDIR)/rules.mk
+          
+          PKG_NAME:=golang
+          PKG_VERSION:=1.25.5
+          PKG_RELEASE:=1
+          
+          PKG_BUILD_DIR:=$(BUILD_DIR)/golang-dummy
+          
+          include $(INCLUDE_DIR)/host-build.mk
+          include $(INCLUDE_DIR)/package.mk
+          
+          define Package/golang
+            SECTION:=lang
+            CATEGORY:=Languages
+            TITLE:=Go programming language (using system Go)
+            URL:=https://golang.org/
+          endef
+          
+          define Host/Prepare
+          	mkdir -p $(HOST_BUILD_DIR)
+          endef
+          
+          define Host/Configure
+          endef
+          
+          define Host/Compile
+          endef
+          
+          define Host/Install
+          	mkdir -p $(STAGING_DIR_HOSTPKG)/bin
+          	ln -sf $(shell which go) $(STAGING_DIR_HOSTPKG)/bin/go
+          	mkdir -p $(STAGING_DIR_HOSTPKG)/lib/go
+          	ln -sf $(shell go env GOROOT)/* $(STAGING_DIR_HOSTPKG)/lib/go/
+          endef
+          
+          $(eval $(call HostBuild))
+          MAKEFILEEOF
+          
+          echo "=== Patching golang-package.mk ==="
           cp "$GOLANG_PKG_MK" "${GOLANG_PKG_MK}.backup"
           
-          cat > "${GOLANG_PKG_MK}.new" << 'EOF'
-          # === FORCED SYSTEM GO 1.24+ ===
+          cat > "$GOLANG_PKG_MK" << 'PACKAGEEOF'
+          ifndef GOLANG_PKG_INCLUDED
+          GOLANG_PKG_INCLUDED:=1
+          
           export GOTOOLCHAIN := local
           export GOROOT := $(shell go env GOROOT)
           export GOPATH := $(shell go env GOPATH)
@@ -77,19 +122,29 @@ jobs:
           export PATH := $(GOROOT)/bin:$(PATH)
           
           GO_VERSION_MAJOR_MINOR := $(shell go version | sed -E 's/.*go([0-9]+\.[0-9]+).*/\1/')
+          GO_VERSION_PATCH := $(shell go version | sed -E 's/.*go([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
           GO_OS := $(shell go env GOOS)
           GO_ARCH := $(shell go env GOARCH)
           GO_ARM := $(shell go env GOARM)
+          
+          GO_HOST_TARGET_DIR := $(GOROOT)
+          GO_HOST_TOOLCHAIN_DIR := $(GOROOT)
+          GO_HOST_WORK_DIR := $(BUILD_DIR_HOST)/go-work
+          
           GO_TAR_BALL :=
           GO_INSTALL_DIR := $(GOROOT)
+          HOST_GO_ROOT := $(GOROOT)
           
-          EOF
+          PACKAGEEOF
           
-          cat "$GOLANG_PKG_MK" >> "${GOLANG_PKG_MK}.new"
-          mv "${GOLANG_PKG_MK}.new" "$GOLANG_PKG_MK"
+          tail -n +10 "${GOLANG_PKG_MK}.backup" >> "$GOLANG_PKG_MK" || true
+          echo "endif" >> "$GOLANG_PKG_MK"
           
-          echo "=== Patch applied, first 25 lines ==="
-          head -n 25 "$GOLANG_PKG_MK"
+          echo "=== Patches applied ==="
+          echo "--- golang Makefile (first 30 lines) ---"
+          head -n 30 "$GOLANG_MAKEFILE"
+          echo "--- golang-package.mk (first 30 lines) ---"
+          head -n 30 "$GOLANG_PKG_MK"
 
       - name: Link Local Source to SDK
         run: |
