@@ -27,7 +27,7 @@ PKG_BUILD_FLAGS:=no-mips16
 GO_PKG:=github.com/DNSCrypt/dnscrypt-proxy
 
 include $(INCLUDE_DIR)/package.mk
-include $(INCLUDE_DIR)/golang-package.mk
+include ../../lang/golang/golang-package.mk
 
 # Переменные окружения для Go (должны совпадать с патчем в build.yaml)
 GO_PKG_BUILD_VARS+= \
