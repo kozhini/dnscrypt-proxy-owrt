@@ -20,16 +20,17 @@ PKG_MAINTAINER:=Josef Schlehofer <pepe.schlehofer@gmail.com>
 PKG_LICENSE:=ISC
 PKG_LICENSE_FILES:=LICENSE
 
-PKG_BUILD_DEPENDS:=golang/host
 PKG_BUILD_PARALLEL:=1
 PKG_BUILD_FLAGS:=no-mips16
 
 GO_PKG:=github.com/DNSCrypt/dnscrypt-proxy
 
 include $(INCLUDE_DIR)/package.mk
-include ../../lang/golang/golang-package.mk
 
-# Переменные окружения для Go (должны совпадать с патчем в build.yaml)
+# Use our custom minimal golang-package.mk (created in workflow)
+include golang-package.mk
+
+# Go build variables
 GO_PKG_BUILD_VARS+= \
 	GO111MODULE=off \
 	GOTOOLCHAIN=local \
@@ -43,7 +44,7 @@ define Package/dnscrypt-proxy2
   TITLE:=Flexible DNS proxy with encrypted DNS protocols
   SUBMENU:=IP Addresses and Names
   URL:=https://github.com/DNSCrypt/dnscrypt-proxy
-  DEPENDS:=$(GO_ARCH_DEPENDS) +ca-bundle
+  DEPENDS:=+ca-bundle
   CONFLICTS:=dnscrypt-proxy
 endef
 
@@ -75,7 +76,8 @@ endef
 
 define Package/golang-github-jedisct1-dnscrypt-proxy2-dev
 $(call Package/dnscrypt-proxy2)
-$(call GoPackage/GoSubMenu)
+  SECTION:=devel
+  CATEGORY:=Development
   TITLE+= (source files)
   PKGARCH:=all
 endef
@@ -86,7 +88,5 @@ $(call Package/dnscrypt-proxy2/description)
   This package provides the source files for the client/bridge program.
 endef
 
-$(eval $(call GoBinPackage,dnscrypt-proxy2))
 $(eval $(call BuildPackage,dnscrypt-proxy2))
-$(eval $(call GoSrcPackage,golang-github-jedisct1-dnscrypt-proxy2-dev))
 $(eval $(call BuildPackage,golang-github-jedisct1-dnscrypt-proxy2-dev))
