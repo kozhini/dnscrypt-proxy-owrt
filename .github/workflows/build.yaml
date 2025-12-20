@@ -2,14 +2,6 @@ name: Build OpenWrt Package
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-      - master
-    paths:
-      - 'Makefile'
-      - 'files/**'
-      - '.github/workflows/build.yaml'
 
 jobs:
   build:
