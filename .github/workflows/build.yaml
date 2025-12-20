@@ -7,7 +7,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      OPENWRT_VERSION: "24.10.4"
+      OPENWRT_VERSION: "24.10.5"
       TARGET: "mediatek"
       SUBTARGET: "filogic"
       ARCH: "aarch64_cortex-a53"
